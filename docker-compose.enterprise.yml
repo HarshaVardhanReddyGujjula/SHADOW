@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  # 1. Edge API Gateway & WebSockets Load Balancer
+  api-gateway:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: always
+
+  # 2. FastAPI Ingestion & Control Plane
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    environment:
+      - REDIS_URL=redis://redis-streams:6379/0
+      - DATABASE_URL=postgresql://shadow_admin:supersecurepass@postgres-db:5432/shadow_siem
+      - CLICKHOUSE_HOST=clickhouse-node:9000
+    depends_on:
+      - redis-streams
+      - postgres-db
+    restart: always
+
+  # 3. High-Throughput Event Queue (Redis Streams / Kafka Broker)
+  redis-streams:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: always
+
+  # 4. Distributed ML Inference Worker Pool (Celery / Ray)
+  ml-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    command: ["python", "-m", "celery", "-A", "celery_worker", "worker", "--concurrency=8", "-l", "info"]
+    environment:
+      - REDIS_URL=redis://redis-streams:6379/0
+      - DATABASE_URL=postgresql://shadow_admin:supersecurepass@postgres-db:5432/shadow_siem
+    depends_on:
+      - redis-streams
+      - postgres-db
+    restart: always
+
+  # 5. Relational State & User RBAC (PostgreSQL)
+  postgres-db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=shadow_siem
+      - POSTGRES_USER=shadow_admin
+      - POSTGRES_PASSWORD=supersecurepass
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: always
+
+  # 6. Ultra-Fast SIEM Telemetry Hot Tier (ClickHouse OLAP Database)
+  clickhouse-node:
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ch-data:/var/lib/clickhouse
+    restart: always
+
+  # 7. React Frontend SOC Web Application
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "5173:80"
+    restart: always
+
+  # 8. Observability & Telemetry Metrics (Prometheus + Grafana)
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    restart: always
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+    restart: always
+
+volumes:
+  redis-data:
+  pg-data:
+  ch-data:

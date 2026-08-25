@@ -1,0 +1,15 @@
+{
+  "name": "shadow-fullstack",
+  "version": "2.0.0",
+  "description": "SHADOW Real-Time AI Threat Detection Platform",
+  "scripts": {
+    "start": "node run_all.js",
+    "dev": "node run_all.js",
+    "backend": "cd backend && .\\venv\\Scripts\\python.exe -m uvicorn main:app --reload --host 127.0.0.1 --port 8000",
+    "frontend": "cd frontend && npm run dev",
+    "simulate": "cd backend && .\\venv\\Scripts\\python.exe simulator.py"
+  },
+  "keywords": ["cybersecurity", "fastapi", "react", "ml", "soc", "siem"],
+  "author": "Chairman Harsha",
+  "license": "MIT"
+}

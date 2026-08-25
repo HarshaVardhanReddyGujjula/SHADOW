@@ -1,0 +1,44 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "🐍 Debug FastAPI Backend (Uvicorn)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "main:app",
+        "--reload",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000"
+      ],
+      "cwd": "${workspaceFolder}/backend",
+      "jinja": true,
+      "justMyCode": true
+    },
+    {
+      "name": "⚡ Debug Simulator Traffic",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/simulator.py",
+      "cwd": "${workspaceFolder}/backend",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "🌐 Launch Frontend in Chrome / Edge",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend/src"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "🛡️ Full Stack Debug (Backend + Frontend)",
+      "configurations": ["🐍 Debug FastAPI Backend (Uvicorn)", "🌐 Launch Frontend in Chrome / Edge"]
+    }
+  ]
+}
