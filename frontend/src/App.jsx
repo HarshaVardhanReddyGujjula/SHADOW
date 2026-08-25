@@ -71,65 +71,122 @@ export default function App() {
       setAlerts(alertsRes);
       setAllEvents(eventsRes);
     } catch (err) {
-      console.error('Error fetching initial dashboard data:', err);
+      // Standalone Browser Demo Fallback for GitHub Pages
+      console.log('Running in Standalone Demo Mode (GitHub Pages)');
+      setIsConnected(true);
+      setStats(prev => ({
+        total_events: prev.total_events || 2840,
+        normal_count: prev.normal_count || 2150,
+        suspicious_count: prev.suspicious_count || 480,
+        high_risk_count: prev.high_risk_count || 210,
+        blocked_ips_count: prev.blocked_ips_count || 14,
+        active_alerts_count: prev.active_alerts_count || 3,
+        avg_recent_risk_score: 42,
+      }));
+
+      setTrendData([
+        { time: '02:00', Normal: 45, Suspicious: 12, 'High Risk': 3 },
+        { time: '02:05', Normal: 52, Suspicious: 14, 'High Risk': 2 },
+        { time: '02:10', Normal: 48, Suspicious: 18, 'High Risk': 8 },
+        { time: '02:15', Normal: 60, Suspicious: 15, 'High Risk': 4 },
+        { time: '02:20', Normal: 55, Suspicious: 22, 'High Risk': 11 },
+        { time: '02:25', Normal: 58, Suspicious: 19, 'High Risk': 6 },
+      ]);
+
+      setSuspiciousIPs(prev => prev.length ? prev : [
+        { id: 1, ip_address: '185.220.101.5', country: 'Germany', max_risk_score: 95, attempt_count: 32, status: 'Blocked' },
+        { id: 2, ip_address: '45.154.255.88', country: 'Russia', max_risk_score: 88, attempt_count: 19, status: 'Blocked' },
+        { id: 3, ip_address: '193.56.29.14', country: 'Netherlands', max_risk_score: 78, attempt_count: 14, status: 'Flagged' },
+        { id: 4, ip_address: '103.251.170.2', country: 'China', max_risk_score: 72, attempt_count: 9, status: 'Flagged' },
+        { id: 5, ip_address: '91.240.118.172', country: 'Bulgaria', max_risk_score: 65, attempt_count: 6, status: 'Flagged' },
+      ]);
+
+      setAlerts(prev => prev.length ? prev : [
+        { id: 1, title: 'Brute Force Attack Detected', description: 'High-frequency failed logins from 185.220.101.5 on account David Miller', risk_level: 'High Risk', risk_score: 95, source_ip: '185.220.101.5', timestamp: '2026-08-26 00:20:11' },
+        { id: 2, title: 'Impossible Travel Anomaly', description: 'Rapid geo-hop from Germany to Singapore (7,800 km) in 4 minutes', risk_level: 'High Risk', risk_score: 88, source_ip: '45.154.255.88', timestamp: '2026-08-26 00:22:45' },
+        { id: 3, title: 'Port Scan Reconnaissance', description: 'Multi-port probe across sensitive sockets 22, 3389, 445', risk_level: 'Suspicious', risk_score: 65, source_ip: '91.240.118.172', timestamp: '2026-08-26 00:25:30' }
+      ]);
     }
   };
 
   useEffect(() => {
     if (user) {
       fetchData();
-      const interval = setInterval(fetchData, 4000);
+      const interval = setInterval(fetchData, 5000);
       return () => clearInterval(interval);
     }
   }, [user]);
 
-  // WebSocket Connection for Live Telemetry
+  // Client Telemetry Generator for Standalone Live Demo
+  useEffect(() => {
+    if (!user) return;
+
+    const names = ["Harsha Vardhan (Chairman)", "Rahul Sharma", "Priya Patel", "David Miller", "Sarah Jenkins", "Vikram Reddy", "Elena Rostova", "Alex Rivera"];
+    const countries = ["India", "United States", "Germany", "United Kingdom", "Singapore", "Japan"];
+    const ips = ["192.168.1.45", "10.0.0.12", "172.16.0.5", "185.220.101.5", "45.154.255.88", "193.56.29.14"];
+    const endpoints = ["/api/auth/login", "/api/v1/telemetry", "/api/admin/dashboard", "/oauth/token", "/api/reports/export"];
+
+    const timer = setInterval(() => {
+      const isHigh = Math.random() < 0.25;
+      const isSusp = !isHigh && Math.random() < 0.35;
+      const r_level = isHigh ? 'High Risk' : isSusp ? 'Suspicious' : 'Normal';
+      const r_score = isHigh ? Math.floor(Math.random() * 25 + 75) : isSusp ? Math.floor(Math.random() * 30 + 40) : Math.floor(Math.random() * 20);
+
+      const fakeEvt = {
+        id: Date.now(),
+        timestamp: new Date().toLocaleTimeString(),
+        event_type: isHigh ? 'Brute Force Burst' : isSusp ? 'Impossible Travel' : 'Login Success',
+        source_ip: ips[Math.floor(Math.random() * ips.length)],
+        country: countries[Math.floor(Math.random() * countries.length)],
+        username: names[Math.floor(Math.random() * names.length)],
+        endpoint: endpoints[Math.floor(Math.random() * endpoints.length)],
+        port: isHigh ? 22 : 443,
+        risk_score: r_score,
+        risk_level: r_level,
+        geo_distance_km: isSusp ? 4200 : 0,
+        unknown_device: isHigh
+      };
+
+      setLiveEvents(prev => [fakeEvt, ...prev.slice(0, 49)]);
+      setAllEvents(prev => [fakeEvt, ...prev.slice(0, 99)]);
+      setStats(prev => ({
+        ...prev,
+        total_events: prev.total_events + 1,
+        normal_count: r_level === 'Normal' ? prev.normal_count + 1 : prev.normal_count,
+        suspicious_count: r_level === 'Suspicious' ? prev.suspicious_count + 1 : prev.suspicious_count,
+        high_risk_count: r_level === 'High Risk' ? prev.high_risk_count + 1 : prev.high_risk_count,
+      }));
+    }, 2800);
+
+    return () => clearInterval(timer);
+  }, [user]);
+
+  // WebSocket Connection for Live Telemetry (When Backend is Active)
   useEffect(() => {
     if (!user) return;
 
     const connectWebSocket = () => {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/threats`;
-      
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
+      try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/threats`;
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
 
-      ws.onopen = () => {
-        setIsConnected(true);
-        console.log('⚡ Connected to Shadow Threat Stream WebSocket');
-      };
+        ws.onopen = () => {
+          setIsConnected(true);
+        };
 
-      ws.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data);
-          if (payload.type === 'NEW_EVENT') {
-            const newEvt = payload.event;
-            setLiveEvents(prev => [newEvt, ...prev.slice(0, 49)]);
-            setAllEvents(prev => [newEvt, ...prev.slice(0, 99)]);
-            
-            // Refresh metrics counter
-            setStats(prev => ({
-              ...prev,
-              total_events: prev.total_events + 1,
-              normal_count: newEvt.risk_level === 'Normal' ? prev.normal_count + 1 : prev.normal_count,
-              suspicious_count: newEvt.risk_level === 'Suspicious' ? prev.suspicious_count + 1 : prev.suspicious_count,
-              high_risk_count: newEvt.risk_level === 'High Risk' ? prev.high_risk_count + 1 : prev.high_risk_count,
-            }));
-          }
-        } catch (e) {
-          console.error('Error parsing WebSocket message:', e);
-        }
-      };
-
-      ws.onclose = () => {
-        setIsConnected(false);
-        setTimeout(connectWebSocket, 3000); // Auto reconnect
-      };
-
-      ws.onerror = () => {
-        setIsConnected(false);
-        ws.close();
-      };
+        ws.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data);
+            if (payload.type === 'NEW_EVENT') {
+              const newEvt = payload.event;
+              setLiveEvents(prev => [newEvt, ...prev.slice(0, 49)]);
+              setAllEvents(prev => [newEvt, ...prev.slice(0, 99)]);
+            }
+          } catch (e) {}
+        };
+      } catch (e) {}
     };
 
     connectWebSocket();
@@ -137,6 +194,7 @@ export default function App() {
       if (wsRef.current) wsRef.current.close();
     };
   }, [user]);
+
 
   // Auth Handlers
   const handleLoginSuccess = (userData, token) => {
